@@ -476,16 +476,19 @@ function slaOp(){
 }
 function opnieuw(){toon('s-locatie');setH('Stap 1 van 3');}
 var signalenLijst = [];
+var verwijderdeSignalen = [];
 
 function bouwSignalen() {
   signalenLijst = [];
   var id = 1;
   sessies.forEach(function(s) {
     s.nieuweLeden.forEach(function(l) {
-      signalenLijst.push({id:id++,type:'nieuw',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd});
+      var sig = {id:id++,type:'nieuw',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd};
+      if (verwijderdeSignalen.indexOf(sig.id) === -1) signalenLijst.push(sig);
     });
     s.leden.filter(function(l){return l.notitie&&!l.nieuw;}).forEach(function(l) {
-      signalenLijst.push({id:id++,type:'opmerking',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd,notitie:l.notitie});
+      var sig = {id:id++,type:'opmerking',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd,notitie:l.notitie};
+      if (verwijderdeSignalen.indexOf(sig.id) === -1) signalenLijst.push(sig);
     });
   });
 }
@@ -602,7 +605,8 @@ function verwijderSignaal(id) {
     el.style.opacity='0';
     el.style.transform='translateX(20px)';
     setTimeout(function(){
-      signalenLijst = signalenLijst.filter(function(s){return s.id!==id;});
+      verwijderdeSignalen.push(id);
+      bouwSignalen();
       renderSignalen();
     }, 300);
   }
