@@ -187,6 +187,8 @@ body{margin:0;background:#f0f0f0;font-family:'Segoe UI',system-ui,sans-serif}
 .notitie-bel{margin-top:4px;background:#fff9e6;border:1.5px solid #e6a800;border-radius:8px;padding:6px 10px;font-size:11px;color:#7a5500;margin-left:38px}
 /* SIGNALEN */
 .sig-kaart{border-radius:12px;padding:12px 14px;margin-bottom:8px;border:2px solid;position:relative;padding-right:40px}
+.sig-kaart.afwezig{background:#fff0f0;border-color:var(--red)}
+.sig-kaart.afwezig h4{color:var(--red-dark)}
 .sig-kaart.nieuw{background:#fff8e8;border-color:#d4a000}
 .sig-kaart.opmerking{background:var(--pur-faint);border-color:var(--pur)}
 .sig-kaart h4{font-size:12px;font-weight:800;margin-bottom:4px}
@@ -478,9 +480,13 @@ function opnieuw(){toon('s-locatie');setH('Stap 1 van 3');}
 var signalenLijst = [];
 var verwijderdeSignalen = [];
 
+var AFWEZIG_DREMPEL = 3; // signaal na X keer aaneengesloten afwezig
+
 function bouwSignalen() {
   signalenLijst = [];
   var id = 1;
+
+  // --- Nieuw lid & opmerkingen signalen ---
   sessies.forEach(function(s) {
     s.nieuweLeden.forEach(function(l) {
       var sig = {id:id++,type:'nieuw',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd};
@@ -490,6 +496,56 @@ function bouwSignalen() {
       var sig = {id:id++,type:'opmerking',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd,notitie:l.notitie};
       if (verwijderdeSignalen.indexOf(sig.id) === -1) signalenLijst.push(sig);
     });
+  });
+
+  // --- Herhaalde afwezigheid detectie ---
+  // Bouw per les+lid een lijst van aanwezigheid in chronologische volgorde
+  var lesLidHistory = {};
+  sessies.slice().sort(function(a,b){ return a.id - b.id; }).forEach(function(s) {
+    s.leden.forEach(function(l) {
+      if (l.nieuw) return;
+      var sleutel = s.lesCode + '|' + l.naam;
+      if (!lesLidHistory[sleutel]) lesLidHistory[sleutel] = {
+        naam: l.naam, les: s.lesNaam, lesCode: s.lesCode,
+        locatie: s.locatie, tijd: s.tijd, reeks: []
+      };
+      lesLidHistory[sleutel].reeks.push({
+        datum: s.datum, aanwezig: l.aanwezig
+      });
+    });
+  });
+
+  // Check per lid: hoeveel keer aaneengesloten afwezig aan het einde?
+  Object.keys(lesLidHistory).forEach(function(sleutel) {
+    var info = lesLidHistory[sleutel];
+    var reeks = info.reeks;
+    if (reeks.length < AFWEZIG_DREMPEL) return; // niet genoeg data
+
+    // Tel aaneengesloten afwezigheid vanaf het EINDE
+    var aansluitend = 0;
+    for (var i = reeks.length - 1; i >= 0; i--) {
+      if (reeks[i].aanwezig === false) {
+        aansluitend++;
+      } else {
+        break; // keten verbroken
+      }
+    }
+
+    if (aansluitend >= AFWEZIG_DREMPEL) {
+      var laatste = reeks[reeks.length - 1].datum;
+      var sig = {
+        id: id++,
+        type: 'afwezig',
+        naam: info.naam,
+        les: info.les,
+        lesCode: info.lesCode,
+        locatie: info.locatie,
+        tijd: info.tijd,
+        aantalKeer: aansluitend,
+        laatstGezien: laatste
+      };
+      if (verwijderdeSignalen.indexOf(sig.id) === -1) signalenLijst.push(sig);
+    }
   });
 }
 
@@ -573,6 +629,20 @@ function renderSignalen() {
   var html = '';
   var nieuwen = signalenLijst.filter(function(s){return s.type==='nieuw';});
   var opmerkingen = signalenLijst.filter(function(s){return s.type==='opmerking';});
+  // Herhaalde afwezigheid
+  var afwezigen = signalenLijst.filter(function(s){return s.type==='afwezig';});
+  if (afwezigen.length) {
+    html += '<div class="sec-hdr">Herhaaldelijk afwezig</div>';
+    afwezigen.forEach(function(s) {
+      html += '<div class="sig-kaart afwezig" id="sig-'+s.id+'">'
+        +'<button class="sig-x" onclick="verwijderSignaal('+s.id+')" title="Verwerkt">&#10005;</button>'
+        +'<h4>&#9888; '+s.naam+'</h4>'
+        +'<div class="sig-meta">'+s.les+' ('+s.lesCode+') &bull; '+s.locatie+' &bull; '+s.tijd+'</div>'
+        +'<div class="sig-inhoud">Al <strong>'+s.aantalKeer+'x achter elkaar</strong> afwezig &bull; laatste les: '+s.laatstGezien+'</div>'
+        +'</div>';
+    });
+  }
+
   if (nieuwen.length) {
     html += '<div class="sec-hdr">Mogelijk niet ingeschreven</div>';
     nieuwen.forEach(function(s) {
