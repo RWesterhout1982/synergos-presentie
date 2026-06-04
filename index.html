@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>Synergos Presentielijst</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyCKDXDCmiGTtT-yfRMdWr7_YiK-43cTnr4",
+  authDomain: "synergos-presentie.firebaseapp.com",
+  databaseURL: "https://synergos-presentie-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "synergos-presentie",
+  storageBucket: "synergos-presentie.firebasestorage.app",
+  messagingSenderId: "876963888500",
+  appId: "1:876963888500:web:0d2f0fd652bb0337eec021"
+});
+var db = firebase.database();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--pur:#6B2FA0;--pur-dark:#4A1F70;--pur-light:#9B59D0;--pur-faint:#f3eaff;--teal:#00BFA5;--teal-dark:#009688;--teal-faint:#e0f7f5;--text:#1a1030;--text-muted:#6b5a80;--green:#27ae60;--green-dark:#1a6e3c;--green-light:#d4f0e2;--red:#e74c3c;--red-dark:#8b1c14;--red-light:#fde8e6}
@@ -217,9 +231,6 @@ body{margin:0;background:#f0f0f0;font-family:'Segoe UI',system-ui,sans-serif}
 .ges-kaart-body.open{display:block}
 .geen-sig{text-align:center;padding:24px;color:var(--text-muted);font-size:13px}
 </style>
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
 <div class="app">
@@ -282,7 +293,11 @@ body{margin:0;background:#f0f0f0;font-family:'Segoe UI',system-ui,sans-serif}
   </div>
   <div class="screen" id="s-pres">
     <div class="prog"><div class="prog-step"><div class="prog-dot done">&#10003;</div><span class="prog-lbl">Locatie</span></div><div class="prog-line done"></div><div class="prog-step"><div class="prog-dot done">&#10003;</div><span class="prog-lbl">Les</span></div><div class="prog-line done"></div><div class="prog-step"><div class="prog-dot active">3</div><span class="prog-lbl">Presentie</span></div></div>
-    <div class="pres-hdr"><h2 id="p-naam"></h2><p id="p-info"></p><div class="pres-stats"><span class="stat-p tot" id="s-tot">0 leden</span><span class="stat-p aan" id="s-aan">0 aanwezig</span><span class="stat-p af" id="s-af">0 afwezig</span></div></div>
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;background:var(--pur-faint);border:2px solid var(--pur-light);border-radius:12px;padding:10px 14px">
+  <span style="font-size:12px;font-weight:700;color:var(--pur-dark);white-space:nowrap">&#128197; Datum les:</span>
+  <input type="date" id="les-datum" style="border:2px solid var(--pur);border-radius:8px;padding:6px 10px;font-size:13px;color:var(--text);background:#fff;font-family:inherit;outline:none;flex:1">
+</div>
+<div class="pres-hdr"><h2 id="p-naam"></h2><p id="p-info"></p><div class="pres-stats"><span class="stat-p tot" id="s-tot">0 leden</span><span class="stat-p aan" id="s-aan">0 aanwezig</span><span class="stat-p af" id="s-af">0 afwezig</span></div></div>
     <div class="uitleg-banner">&#9432; Tik &#10003; voor aanwezig of &#10005; voor afwezig</div>
     <div class="leden-list" id="leden-list"></div>
     <button class="nieuw-btn" onclick="toggleNieuw()">+ Nieuw lid toevoegen</button>
@@ -327,20 +342,6 @@ var loc = null;
 var les = null;
 var leden = [];
 var sessies = [];
-var db = null;
-
-// Firebase initialisatie
-var firebaseConfig = {
-  apiKey: "AIzaSyCKDXDCmiGTtT-yfRMdWr7_YiK-43cTnr4",
-  authDomain: "synergos-presentie.firebaseapp.com",
-  databaseURL: "https://synergos-presentie-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "synergos-presentie",
-  storageBucket: "synergos-presentie.firebasestorage.app",
-  messagingSenderId: "876963888500",
-  appId: "1:876963888500:web:0d2f0fd652bb0337eec021"
-};
-firebase.initializeApp(firebaseConfig);
-db = firebase.database();
 
 // Verwijder real-time listener - we laden data alleen bij admin login
 
@@ -461,7 +462,14 @@ function kiesLes(code, naam, dag, tijd) {
     .map(function(l) { return {nr:l.nr,naam:l.naam,geb:l.geb,leeftijd:l.leeftijd,geslacht:l.geslacht,tel:l.tel||'',mob:l.mob||'',aanwezig:null,notitie:'',nieuw:false}; });
   if (leden.length === 0) leden = [{nr:'',naam:'Geen leden voor '+code,geb:'',leeftijd:'',geslacht:'F',aanwezig:null,notitie:'',nieuw:false}];
   document.getElementById('p-naam').textContent = naam;
-  document.getElementById('p-info').textContent = dag + ' ' + tijd + ' \u2022 ' + loc + ' \u2022 ' + new Date().toLocaleDateString('nl-NL');
+  document.getElementById('p-info').textContent = (dag||'') + (tijd?' '+tijd:'') + ' \u2022 ' + loc;
+  // Zet standaard datum op vandaag
+  var vandaag = new Date();
+  var dd = String(vandaag.getDate()).padStart(2,'0');
+  var mm = String(vandaag.getMonth()+1).padStart(2,'0');
+  var yyyy = vandaag.getFullYear();
+  var datveld = document.getElementById('les-datum');
+  if (datveld) datveld.value = yyyy + '-' + mm + '-' + dd;
   renderLeden(); toon('s-pres'); setH('Stap 3 van 3');
 }
 function renderLeden() {
@@ -536,7 +544,14 @@ function slaOp(){
   var sessieId = Date.now();
   var sessie = {
     id: sessieId,
-    datum: new Date().toLocaleDateString('nl-NL'),
+    datum: (function(){
+      var d = document.getElementById('les-datum');
+      if (d && d.value) {
+        var parts = d.value.split('-');
+        return parts[2]+'-'+parts[1]+'-'+parts[0];
+      }
+      return new Date().toLocaleDateString('nl-NL');
+    })(),
     lesCode: les.code,
     lesNaam: les.naam,
     locatie: loc,
@@ -549,6 +564,10 @@ function slaOp(){
   };
 
   // Sla op in Firebase
+  if (!db) {
+    alert('Geen verbinding met database. Controleer je internet en probeer opnieuw.');
+    return;
+  }
   var opslaan = document.getElementById('opslaan-btn');
   if (opslaan) { opslaan.textContent = 'Bezig met opslaan...'; opslaan.style.pointerEvents = 'none'; }
 
@@ -655,6 +674,22 @@ function laadAdmin() {
   var admContent = document.getElementById('tab-pres');
   if (admContent) admContent.innerHTML = '<div class="leeg">&#8987; Data laden...</div>';
 
+  // Wacht tot Firebase beschikbaar is (max 10 sec)
+  var pogingen = 0;
+  function probeer() {
+    if (!db) {
+      pogingen++;
+      if (pogingen > 20) {
+        if (admContent) admContent.innerHTML = '<div class="leeg">&#10007; Geen verbinding met database. Controleer je internet en herlaad de pagina.</div>';
+        return;
+      }
+      setTimeout(probeer, 500);
+      return;
+    }
+    laadVanFirebase();
+  }
+
+  function laadVanFirebase() {
   db.ref('sessies').once('value', function(snapshot) {
     sessies = [];
     var data = snapshot.val();
@@ -671,6 +706,8 @@ function laadAdmin() {
   }).catch(function(err) {
     if (admContent) admContent.innerHTML = '<div class="leeg">&#10007; Fout bij laden: ' + err.message + '</div>';
   });
+  } // einde laadVanFirebase
+  probeer();
 }
 
 function admTab(t, btn) {
@@ -717,9 +754,6 @@ function renderPresentielijsten() {
           +'<span class="lid-naam-sm">'+l.naam+(l.nr&&l.nr!=='NIEUW'?' <span style="color:var(--text-muted);font-size:10px">#'+l.nr+'</span>':'')+'</span>'
           +'<span class="lid-st '+stK+'">'+stT+'</span>'
           +'</div>'
-          +telBtns(l.tel, l.mob, l.naam)
-          +telBtns(l.tel, l.mob, l.naam)
-          +telBtns(l.tel, l.mob, l.naam)
         +(l.notitie?'<div class="notitie-bel">'+l.notitie+'</div>':'')+'</div>';
       });
       html += '</div></div>';
@@ -833,8 +867,6 @@ function renderGeschiedenis() {
         +'<span class="lid-naam-sm">'+l.naam+'</span>'
         +'<span class="lid-st '+stK+'">'+stT+'</span>'
         +'</div>'
-        +telBtns(l.tel, l.mob, l.naam)
-        +telBtns(l.tel, l.mob, l.naam)
         +(l.notitie?'<div class="notitie-bel">'+l.notitie+'</div>':'')+'</div>';
     });
     html += '</div></div>';
@@ -850,6 +882,21 @@ function toggleGes(id) {
   body.className = 'ges-kaart-body'+(open?'':' open');
   pijl.className = 'pres-pijl'+(open?'':' open');
 }
+</script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+var firebaseConfig = {
+  apiKey: "AIzaSyCKDXDCmiGTtT-yfRMdWr7_YiK-43cTnr4",
+  authDomain: "synergos-presentie.firebaseapp.com",
+  databaseURL: "https://synergos-presentie-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "synergos-presentie",
+  storageBucket: "synergos-presentie.firebasestorage.app",
+  messagingSenderId: "876963888500",
+  appId: "1:876963888500:web:0d2f0fd652bb0337eec021"
+};
+firebase.initializeApp(firebaseConfig);
+db = firebase.database();
 </script>
 </body>
 </html>
