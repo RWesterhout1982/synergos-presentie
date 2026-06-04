@@ -342,18 +342,7 @@ var firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 db = firebase.database();
 
-// Luister real-time naar sessies uit Firebase
-db.ref('sessies').on('value', function(snapshot) {
-  sessies = [];
-  var data = snapshot.val();
-  if (data) {
-    Object.keys(data).forEach(function(key) {
-      sessies.push(data[key]);
-    });
-    // Sorteer op id (chronologisch)
-    sessies.sort(function(a, b) { return a.id - b.id; });
-  }
-});
+// Verwijder real-time listener - we laden data alleen bij admin login
 
 function normTel(nr) {
   if (!nr) return '';
@@ -649,17 +638,29 @@ function bouwSignalen() {
   });
 }
 
+function normaliseerSessie(s) {
+  // Firebase slaat arrays op als objecten — zet ze terug naar echte arrays
+  if (s.leden && !Array.isArray(s.leden)) {
+    s.leden = Object.values(s.leden);
+  }
+  if (!s.leden) s.leden = [];
+  if (s.nieuweLeden && !Array.isArray(s.nieuweLeden)) {
+    s.nieuweLeden = Object.values(s.nieuweLeden);
+  }
+  if (!s.nieuweLeden) s.nieuweLeden = [];
+  return s;
+}
+
 function laadAdmin() {
-  // Haal altijd de meest recente data op uit Firebase
   var admContent = document.getElementById('tab-pres');
-  if (admContent) admContent.innerHTML = '<div class="leeg">&#8987; Data laden uit database...</div>';
+  if (admContent) admContent.innerHTML = '<div class="leeg">&#8987; Data laden...</div>';
 
   db.ref('sessies').once('value', function(snapshot) {
     sessies = [];
     var data = snapshot.val();
     if (data) {
       Object.keys(data).forEach(function(key) {
-        sessies.push(data[key]);
+        sessies.push(normaliseerSessie(data[key]));
       });
       sessies.sort(function(a, b) { return a.id - b.id; });
     }
@@ -667,6 +668,8 @@ function laadAdmin() {
     var el = document.getElementById('sig-count');
     if (el) el.textContent = signalenLijst.length || '';
     renderPresentielijsten();
+  }).catch(function(err) {
+    if (admContent) admContent.innerHTML = '<div class="leeg">&#10007; Fout bij laden: ' + err.message + '</div>';
   });
 }
 
