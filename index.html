@@ -168,6 +168,14 @@ body{margin:0;background:#f0f0f0;font-family:'Segoe UI',system-ui,sans-serif}
 .gpill.nw{background:var(--pur-faint);color:var(--pur-dark)}
 .sel-bg{background:linear-gradient(135deg,#2a0a4a,#6B2FA0);display:flex;align-items:center;justify-content:center}
 .leeg{text-align:center;padding:28px 16px;color:var(--text-muted);font-size:14px}
+.wis-btn{width:100%;margin-top:20px;background:#fff;border:2px solid var(--red);color:var(--red);border-radius:14px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.2s}
+.wis-btn:hover{background:var(--red);color:#fff}
+.confirm-wrap{background:var(--red-light);border:2px solid var(--red);border-radius:14px;padding:16px;margin-top:16px;display:none}
+.confirm-wrap.open{display:block}
+.confirm-wrap p{font-size:13px;color:var(--red-dark);font-weight:600;margin-bottom:12px;text-align:center}
+.confirm-btns{display:flex;gap:10px}
+.confirm-ja{flex:1;background:var(--red);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer}
+.confirm-nee{flex:1;background:#fff;color:var(--text);border:2px solid var(--border);border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer}
 .nw-badge{background:#ff9500;color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:6px;vertical-align:middle}
 .tel-btns{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 .tel-btn{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:none;text-decoration:none;transition:all 0.15s}
@@ -194,6 +202,8 @@ body{margin:0;background:#f0f0f0;font-family:'Segoe UI',system-ui,sans-serif}
 .pres-pill.af{background:rgba(231,76,60,0.35);color:#ffe8e6}
 .pres-pill.nw{background:rgba(255,149,0,0.35);color:#fff3e0}
 .pres-pijl{color:rgba(255,255,255,0.8);font-size:18px;margin-left:6px;transition:transform 0.2s;display:inline-block}
+.pres-del{background:rgba(231,76,60,0.25);border:1.5px solid rgba(231,76,60,0.6);color:#fff;border-radius:8px;padding:4px 8px;font-size:13px;cursor:pointer;margin-left:6px;transition:all 0.15s;flex-shrink:0}
+.pres-del:hover{background:var(--red);border-color:var(--red)}
 .pres-pijl.open{transform:rotate(90deg)}
 .pres-kaart-body{display:none;padding:12px 14px;border-top:2px solid #e0d8f0}
 .pres-kaart-body.open{display:block}
@@ -743,6 +753,7 @@ function renderPresentielijsten() {
         +(s.nieuweLeden.length?'<span class="pres-pill nw">+'+s.nieuweLeden.length+'</span>':'')
         +(aantalOpm?'<span class="pres-pill" style="background:rgba(255,255,255,0.25);color:#fff">&#128203; '+aantalOpm+'</span>':'')
         +'<span class="pres-pijl" id="ppijl-'+s.id+'">&#8250;</span>'
+        +'<button class="pres-del" onclick="verwijderSessie(event,'+s.id+')" title="Verwijder deze lijst">&#128465;</button>'
         +'</div></div>'
         +'<div class="pres-kaart-body" id="pbody-'+s.id+'">';
       s.leden.forEach(function(l) {
@@ -759,7 +770,50 @@ function renderPresentielijsten() {
       html += '</div></div>';
     });
   });
+  // Voeg wis-knop toe als er sessies zijn
+  if (sessies.length) {
+    html += '<button class="wis-btn" onclick="toggleWisBevestiging()">&#128465; Alle presentielijsten wissen</button>';
+    html += '<div class="confirm-wrap" id="wis-confirm">'
+          + '<p>&#9888; Weet je het zeker? Dit verwijdert <strong>alle</strong> presentielijsten permanent uit de database!</p>'
+          + '<div class="confirm-btns">'
+          + '<button class="confirm-nee" onclick="toggleWisBevestiging()">Annuleren</button>'
+          + '<button class="confirm-ja" onclick="wisAlles()">Ja, alles wissen</button>'
+          + '</div></div>';
+  }
   el.innerHTML = html;
+}
+
+function verwijderSessie(event, id) {
+  event.stopPropagation(); // voorkom dat de kaart uitklapt
+  if (!confirm('Deze presentielijst verwijderen?')) return;
+  db.ref('sessies/' + id).remove().then(function() {
+    sessies = sessies.filter(function(s){ return s.id !== id; });
+    bouwSignalen();
+    var el = document.getElementById('sig-count');
+    if (el) el.textContent = signalenLijst.length || '';
+    renderPresentielijsten();
+  }).catch(function(err) {
+    alert('Fout bij verwijderen: ' + err.message);
+  });
+}
+
+function toggleWisBevestiging() {
+  var el = document.getElementById('wis-confirm');
+  if (el) el.classList.toggle('open');
+}
+
+function wisAlles() {
+  db.ref('sessies').remove().then(function() {
+    sessies = [];
+    signalenLijst = [];
+    verwijderdeSignalen = [];
+    renderPresentielijsten();
+    // Update signalen teller
+    var el = document.getElementById('sig-count');
+    if (el) el.textContent = '';
+  }).catch(function(err) {
+    alert('Fout bij wissen: ' + err.message);
+  });
 }
 
 function togglePres(id) {
