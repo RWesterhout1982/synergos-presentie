@@ -598,26 +598,47 @@ function opnieuw(){toon('s-locatie');setH('Stap 1 van 3');}
 var signalenLijst = [];
 var verwijderdeSignalen = [];
 
+// Laad verwijderde signalen uit Firebase
+function laadVerwijderdeSignalen(callback) {
+  if (!db) { callback(); return; }
+  db.ref('verwijderdeSignalen').once('value', function(snap) {
+    var data = snap.val();
+    if (data) {
+      verwijderdeSignalen = Array.isArray(data) ? data : Object.values(data);
+    } else {
+      verwijderdeSignalen = [];
+    }
+    callback();
+  }).catch(function() { callback(); });
+}
+
 var AFWEZIG_DREMPEL = 3; // signaal na X keer aaneengesloten afwezig
+
+function maakSigId(type, naam, extra) {
+  // Stabiele ID op basis van inhoud - blijft hetzelfde na herladen
+  return type + '|' + naam + '|' + (extra || '');
+}
 
 function bouwSignalen() {
   signalenLijst = [];
-  var id = 1;
 
   // --- Nieuw lid & opmerkingen signalen ---
   sessies.forEach(function(s) {
     s.nieuweLeden.forEach(function(l) {
-      var sig = {id:id++,type:'nieuw',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd};
-      if (verwijderdeSignalen.indexOf(sig.id) === -1) signalenLijst.push(sig);
+      var sigId = maakSigId('nieuw', l.naam, s.datum + '|' + s.lesCode);
+      if (verwijderdeSignalen.indexOf(sigId) === -1) {
+        signalenLijst.push({id:sigId,type:'nieuw',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd});
+      }
     });
     s.leden.filter(function(l){return l.notitie&&!l.nieuw;}).forEach(function(l) {
-      var sig = {id:id++,type:'opmerking',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd,notitie:l.notitie};
-      if (verwijderdeSignalen.indexOf(sig.id) === -1) signalenLijst.push(sig);
+      var sigId = maakSigId('opmerking', l.naam, s.datum + '|' + s.lesCode);
+      if (verwijderdeSignalen.indexOf(sigId) === -1) {
+        signalenLijst.push({id:sigId,type:'opmerking',naam:l.naam,les:s.lesNaam,lesCode:s.lesCode,locatie:s.locatie,datum:s.datum,tijd:s.tijd,notitie:l.notitie});
+      }
     });
   });
 
   // --- Herhaalde afwezigheid detectie ---
-  // Bouw per les+lid een lijst van aanwezigheid in chronologische volgorde
   var lesLidHistory = {};
   sessies.slice().sort(function(a,b){ return a.id - b.id; }).forEach(function(s) {
     s.leden.forEach(function(l) {
@@ -627,42 +648,29 @@ function bouwSignalen() {
         naam: l.naam, les: s.lesNaam, lesCode: s.lesCode,
         locatie: s.locatie, tijd: s.tijd, reeks: []
       };
-      lesLidHistory[sleutel].reeks.push({
-        datum: s.datum, aanwezig: l.aanwezig
-      });
+      lesLidHistory[sleutel].reeks.push({datum: s.datum, aanwezig: l.aanwezig});
     });
   });
 
-  // Check per lid: hoeveel keer aaneengesloten afwezig aan het einde?
   Object.keys(lesLidHistory).forEach(function(sleutel) {
     var info = lesLidHistory[sleutel];
     var reeks = info.reeks;
-    if (reeks.length < AFWEZIG_DREMPEL) return; // niet genoeg data
-
-    // Tel aaneengesloten afwezigheid vanaf het EINDE
+    if (reeks.length < AFWEZIG_DREMPEL) return;
     var aansluitend = 0;
     for (var i = reeks.length - 1; i >= 0; i--) {
-      if (reeks[i].aanwezig === false) {
-        aansluitend++;
-      } else {
-        break; // keten verbroken
-      }
+      if (reeks[i].aanwezig === false) { aansluitend++; } else { break; }
     }
-
     if (aansluitend >= AFWEZIG_DREMPEL) {
-      var laatste = reeks[reeks.length - 1].datum;
-      var sig = {
-        id: id++,
-        type: 'afwezig',
-        naam: info.naam,
-        les: info.les,
-        lesCode: info.lesCode,
-        locatie: info.locatie,
-        tijd: info.tijd,
-        aantalKeer: aansluitend,
-        laatstGezien: laatste
-      };
-      if (verwijderdeSignalen.indexOf(sig.id) === -1) signalenLijst.push(sig);
+      var sigId = maakSigId('afwezig', info.naam, info.lesCode);
+      if (verwijderdeSignalen.indexOf(sigId) === -1) {
+        signalenLijst.push({
+          id: sigId, type: 'afwezig',
+          naam: info.naam, les: info.les, lesCode: info.lesCode,
+          locatie: info.locatie, tijd: info.tijd,
+          aantalKeer: aansluitend,
+          laatstGezien: reeks[reeks.length-1].datum
+        });
+      }
     }
   });
 }
@@ -684,7 +692,6 @@ function laadAdmin() {
   var admContent = document.getElementById('tab-pres');
   if (admContent) admContent.innerHTML = '<div class="leeg">&#8987; Data laden...</div>';
 
-  // Wacht tot Firebase beschikbaar is (max 10 sec)
   var pogingen = 0;
   function probeer() {
     if (!db) {
@@ -696,7 +703,10 @@ function laadAdmin() {
       setTimeout(probeer, 500);
       return;
     }
-    laadVanFirebase();
+    // Laad eerst de verwijderde signalen, dan pas de sessies
+    laadVerwijderdeSignalen(function() {
+      laadVanFirebase();
+    });
   }
 
   function laadVanFirebase() {
@@ -804,11 +814,12 @@ function toggleWisBevestiging() {
 
 function wisAlles() {
   db.ref('sessies').remove().then(function() {
+    return db.ref('verwijderdeSignalen').remove();
+  }).then(function() {
     sessies = [];
     signalenLijst = [];
     verwijderdeSignalen = [];
     renderPresentielijsten();
-    // Update signalen teller
     var el = document.getElementById('sig-count');
     if (el) el.textContent = '';
   }).catch(function(err) {
@@ -885,6 +896,10 @@ function verwijderSignaal(id) {
     el.style.transform='translateX(20px)';
     setTimeout(function(){
       verwijderdeSignalen.push(id);
+      // Sla op in Firebase zodat het na herladen bewaard blijft
+      if (db) {
+        db.ref('verwijderdeSignalen').set(verwijderdeSignalen);
+      }
       bouwSignalen();
       renderSignalen();
     }, 300);
