@@ -855,7 +855,7 @@ function renderSignalen() {
     html += '<div class="sec-hdr">Herhaaldelijk afwezig</div>';
     afwezigen.forEach(function(s) {
       html += '<div class="sig-kaart afwezig" id="sig-'+s.id+'">'
-        +'<button class="sig-x" onclick="verwijderSignaal('+s.id+')" title="Verwerkt">&#10005;</button>'
+        +'<button class="sig-x" onclick="verwijderSignaal(\''+s.id+'\')" title="Verwerkt">&#10005;</button>'
         +'<h4>&#9888; '+s.naam+'</h4>'
         +'<div class="sig-meta">'+s.les+' ('+s.lesCode+') &bull; '+s.locatie+' &bull; '+s.tijd+'</div>'
         +'<div class="sig-inhoud">Al <strong>'+s.aantalKeer+'x achter elkaar</strong> afwezig &bull; laatste les: '+s.laatstGezien+'</div>'
@@ -867,7 +867,7 @@ function renderSignalen() {
     html += '<div class="sec-hdr">Mogelijk niet ingeschreven</div>';
     nieuwen.forEach(function(s) {
       html += '<div class="sig-kaart nieuw" id="sig-'+s.id+'">'
-        +'<button class="sig-x" onclick="verwijderSignaal('+s.id+')" title="Verwerkt">&#10005;</button>'
+        +'<button class="sig-x" onclick="verwijderSignaal(\''+s.id+'\')" title="Verwerkt">&#10005;</button>'
         +'<h4>&#128100; '+s.naam+'</h4>'
         +'<div class="sig-meta">'+s.datum+' &bull; '+s.les+' ('+s.lesCode+') &bull; '+s.locatie+' &bull; '+s.tijd+'</div>'
         +'<div class="sig-inhoud">Aangemeld als nieuw lid tijdens de les</div>'
@@ -878,7 +878,7 @@ function renderSignalen() {
     html += '<div class="sec-hdr">Opmerkingen leiding</div>';
     opmerkingen.forEach(function(s) {
       html += '<div class="sig-kaart opmerking" id="sig-'+s.id+'">'
-        +'<button class="sig-x" onclick="verwijderSignaal('+s.id+')" title="Verwerkt">&#10005;</button>'
+        +'<button class="sig-x" onclick="verwijderSignaal(\''+s.id+'\')" title="Verwerkt">&#10005;</button>'
         +'<h4>&#128203; '+s.naam+'</h4>'
         +'<div class="sig-meta">'+s.datum+' &bull; '+s.les+' ('+s.lesCode+') &bull; '+s.locatie+' &bull; '+s.tijd+'</div>'
         +'<div class="sig-inhoud">"'+s.notitie+'"</div>'
