@@ -680,6 +680,12 @@ function herstelSessie_id(id) {
 }
 
 function herstelSessie(sessie) {
+  // Reset de opslaan knop zodat die weer klikbaar is
+  var opslaan = document.getElementById('opslaan-btn');
+  if (opslaan) {
+    opslaan.textContent = '✓ Presentielijst opslaan';
+    opslaan.style.pointerEvents = '';
+  }
   // Zet locatie en les terug
   loc = sessie.locatie;
   les = {code: sessie.lesCode, naam: sessie.lesNaam, dag: sessie.dag, tijd: sessie.tijd};
