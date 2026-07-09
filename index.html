@@ -578,6 +578,7 @@ function slaOp(){
   var af=leden.filter(function(l){return l.aanwezig===false;}).length;
   var nw=leden.filter(function(l){return l.nieuw;});
   var sessieId = huidigeSessieId || Date.now();
+  huidigeSessieId = sessieId; // bewaar voor de bewerk-knop
   var sessie = {
     id: sessieId,
     datum: (function(){
@@ -608,6 +609,13 @@ function slaOp(){
   if (opslaan) { opslaan.textContent = 'Bezig met opslaan...'; opslaan.style.pointerEvents = 'none'; }
 
   db.ref('sessies/' + sessieId).set(sessie).then(function() {
+    // Update lokale sessies array zodat bewerken direct werkt
+    var bestaand = sessies.findIndex(function(s){ return s.id === sessieId; });
+    if (bestaand >= 0) {
+      sessies[bestaand] = normaliseerSessie(JSON.parse(JSON.stringify(sessie)));
+    } else {
+      sessies.push(normaliseerSessie(JSON.parse(JSON.stringify(sessie))));
+    }
     document.getElementById('sam').innerHTML=
       '<div class="sam-row"><span class="sam-l">Les</span><span class="sam-v">'+les.naam+'</span></div>'+
       '<div class="sam-row"><span class="sam-l">Datum</span><span class="sam-v">'+new Date().toLocaleDateString('nl-NL')+'</span></div>'+
