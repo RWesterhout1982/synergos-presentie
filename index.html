@@ -482,6 +482,9 @@ function kiesLes(code, naam, dag, tijd) {
   var dagTekst = dag || new Date().toLocaleDateString('nl-NL', {weekday:'long'});
   var tijdTekst = tijd || new Date().toLocaleTimeString('nl-NL', {hour:'2-digit',minute:'2-digit'});
   les = {code:code, naam:naam, dag:dagTekst, tijd:tijdTekst};
+  // Reset de opslaan knop altijd bij het kiezen van een les
+  var opslaan = document.getElementById('opslaan-btn');
+  if (opslaan) { opslaan.textContent = '✓ Presentielijst opslaan'; opslaan.style.pointerEvents = ''; }
   leden = LEDENDATA.filter(function(l) { return l.les === code; })
     .map(function(l) { return {nr:l.nr,naam:l.naam,geb:l.geb,leeftijd:l.leeftijd,geslacht:l.geslacht,tel:l.tel||'',mob:l.mob||'',aanwezig:null,notitie:'',nieuw:false}; });
   if (leden.length === 0) leden = [{nr:'',naam:'Geen leden voor '+code,geb:'',leeftijd:'',geslacht:'F',aanwezig:null,notitie:'',nieuw:false}];
